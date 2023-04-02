@@ -6,6 +6,7 @@ from sys import argv
 pyast_ns = "http:/ki.ujep.cz/ns/py_ast"
 qc_ns = "http:/ki.ujep.cz/ns/qc_ast"
 
+
 def with_ns(tag, ns):
     return f"{{{ns}}}{tag}"
 
@@ -38,6 +39,9 @@ def generate(ast_node: AST, xtree: ET.Element, in_expression=False):
                         case cmpop():
                             ET.SubElement(fieldnode, with_ns("operator", pyast_ns),
                                   symbol=comparator_map[item.__class__])
+                        case expr() if not in_expression:
+                            exprnode = ET.SubElement(fieldnode, with_ns("expression", qc_ns))
+                            generate(item, exprnode, True)
                         case AST():
                             generate(item, fieldnode, in_expression)
                         case None:
@@ -68,7 +72,7 @@ def generate(ast_node: AST, xtree: ET.Element, in_expression=False):
 
 ast = parse(open(argv[1], "rt").read())
 ET.register_namespace("py", pyast_ns)
-ET.register_namespace("qc", qc_ns)
+ET.register_namespace("", qc_ns)
 root = ET.Element(f"{{{pyast_ns}}}ast")
 generate(ast, root)
 print(ET.tostring(root, encoding="unicode"))

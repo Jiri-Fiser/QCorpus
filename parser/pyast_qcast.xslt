@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"
                 xmlns:py="http:/ki.ujep.cz/ns/py_ast"
-                xmlns:qc="http:/ki.ujep.cz/ns/qc_ast">
+                xmlns="http:/ki.ujep.cz/ns/qc_ast" xmlns:xslt="http://www.w3.org/1999/XSL/Transform">
   <xsl:output method="xml" indent="yes"/>
 
   <xsl:template match="py:Assign">
-     <qc:command type="assignment"><xsl:apply-templates/></qc:command>
+     <command type="assignment"><xsl:apply-templates/></command>
   </xsl:template>
 
   <xsl:template match="py:Assign/py:targets">
-    <qc:left><xsl:apply-templates/></qc:left>
+    <left><xsl:apply-templates/></left>
   </xsl:template>
 
   <xsl:template match="py:Assign/py:value">
-    <qc:right><xsl:apply-templates/></qc:right>
+    <right><xsl:apply-templates/></right>
   </xsl:template>
 
   <xsl:template match="py:Module">
-    <qc:module>
+    <module>
       <xsl:apply-templates select="py:body/*"/>
-    </qc:module>
+    </module>
   </xsl:template>
 
   <xsl:template match="py:ast">
@@ -27,105 +27,157 @@
   </xsl:template>
 
   <xsl:template match="py:Name">
-    <qc:variable name="{@id}"/>
+    <variable name="{@id}"/>
   </xsl:template>
 
   <xsl:template match="py:BinOp">
-    <qc:operator arity="2" symbol="{py:operator/@symbol}">
+    <operator arity="2" symbol="{py:operator/@symbol}">
       <xsl:apply-templates select="py:left/*"/>
       <xsl:apply-templates select="py:right/*"/>
-    </qc:operator>
+    </operator>
   </xsl:template>
 
    <xsl:template match="py:BoolOp">
-    <qc:operator arity="2" symbol="{py:operator/@symbol}" non_strict="true">
+    <operator arity="2" symbol="{py:operator/@symbol}" non_strict="true">
       <xsl:apply-templates select="py:values/*"/>
-    </qc:operator>
+    </operator>
   </xsl:template>
 
     <xsl:template match="py:Compare[count(py:ops/*) = 1]">
-    <qc:operator arity="2" symbol="{py:ops/py:operator/@symbol}">
+    <operator arity="2" symbol="{py:ops/py:operator/@symbol}">
       <xsl:apply-templates select="py:left/*"/>
       <xsl:apply-templates select="py:comparators/*"/>
-    </qc:operator>
+    </operator>
   </xsl:template>
 
     <xsl:template match="py:UnaryOp">
-    <qc:operator arity="1" symbol="{py:operator/@symbol}">
+    <operator arity="1" symbol="{py:operator/@symbol}">
       <xsl:apply-templates select="py:operand/*"/>
-    </qc:operator>
+    </operator>
+  </xsl:template>
+
+  <xsl:template match="py:Subscript">
+    <indexing>
+      <xsl:attribute name="dimensions">
+        <xsl:choose>
+          <xsl:when test="py:slice/py:Tuple"><xsl:value-of select="count(py:slice/py:Tuple/py:elts/*)"/></xsl:when>
+          <xsl:otherwise>1</xsl:otherwise>
+        </xsl:choose>
+      </xsl:attribute>
+      <container>
+        <xsl:apply-templates select="py:value/*"/>
+      </container>
+      <index>
+        <xsl:apply-templates select="py:slice/*"/>
+      </index>
+    </indexing>
+  </xsl:template>
+  
+  <xsl:template match="py:Slice">
+    <range>
+      <start>
+        <xsl:choose>
+          <xsl:when test="py:lower"><xsl:apply-templates select="py:lower/*"/></xsl:when>
+          <xsl:otherwise><xsl:attribute name="implicit">0</xsl:attribute></xsl:otherwise>
+        </xsl:choose>
+      </start>
+      <end>
+        <xsl:choose>
+          <xsl:when test="py:upper"><xsl:apply-templates select="py:upper/*"/></xsl:when>
+          <xsl:otherwise><xsl:attribute name="implicit">size-1</xsl:attribute></xsl:otherwise>
+        </xsl:choose>
+      </end>
+      <step>
+        <xsl:choose>
+          <xsl:when test="py:step"><xsl:apply-templates select="py:step/*"/></xsl:when>
+          <xsl:otherwise><xsl:attribute name="implicit">1</xsl:attribute></xsl:otherwise>
+        </xsl:choose>
+      </step>
+    </range>
   </xsl:template>
 
   <xsl:template match="py:Constant">
-    <qc:literal>
+    <literal>
       <xsl:apply-templates select="@*"/>
-    </qc:literal>
+    </literal>
   </xsl:template>
 
   <xsl:template match="py:List">
-    <qc:collection type="list">
+    <collection type="list">
       <xsl:apply-templates select="py:elts/*"/>
-    </qc:collection>
+    </collection>
   </xsl:template>
 
   <xsl:template match="py:Tuple">
-    <qc:collection type="tuple">
+    <collection type="tuple">
       <xsl:apply-templates select="py:elts/*"/>
-    </qc:collection>
+    </collection>
   </xsl:template>
 
   <xsl:template match="py:Set">
-    <qc:collection type="set">
+    <collection type="set">
       <xsl:apply-templates select="py:elts/*"/>
-    </qc:collection>
+    </collection>
+  </xsl:template>
+
+  <xsl:template match="py:Dict">
+    <collection type="dictionary">
+      <xsl:for-each select="py:keys/*">
+        <xsl:variable name="pos" select="position()"/>
+        <pair>
+          <xsl:apply-templates select="."/>
+          <xsl:apply-templates select="../../py:values/*[$pos]"/>
+        </pair>
+      </xsl:for-each>
+    </collection>
   </xsl:template>
 
   <xsl:template match="py:Expr">
-    <qc:statement type="expression">
+    <statement type="expression">
       <xsl:apply-templates select="py:value/*"/>
-    </qc:statement>
+    </statement>
   </xsl:template>
 
   <xsl:template match="py:Call[py:func/py:Name]">
-    <qc:call name="{py:func/py:Name/@id}" complex="false">
-      <qc:args>
+    <call name="{py:func/py:Name/@id}" complex="false">
+      <arguments>
         <xsl:call-template name="call_args"/>
-      </qc:args>
-    </qc:call>
+      </arguments>
+    </call>
   </xsl:template>
 
   <xsl:template name="call_args">
     <xsl:for-each select="py:args/*">
       <xsl:choose>
         <xsl:when test="self::py:Starred">
-          <qc:argument type="positional" unpacking="true"><xsl:apply-templates select="py:value/*"/></qc:argument>
+          <argument type="positional" unpacking="true"><xsl:apply-templates select="py:value/*"/></argument>
         </xsl:when>
         <xsl:otherwise>
-          <qc:argument type="positional" unpacking="false"><xsl:apply-templates select="."/></qc:argument>
+          <argument type="positional" unpacking="false"><xsl:apply-templates select="."/></argument>
         </xsl:otherwise>
       </xsl:choose>
     </xsl:for-each>
     <xsl:for-each select="py:keywords/*">
       <xsl:choose>
         <xsl:when test="@arg">
-          <qc:argument type="named" name="{@arg}" unpacking="false"><xsl:apply-templates select="py:value/*"/></qc:argument>
+          <argument type="named" name="{@arg}" unpacking="false"><xsl:apply-templates select="py:value/*"/></argument>
         </xsl:when>
         <xsl:otherwise>
-          <qc:argument type="named" unpacking="true"><xsl:apply-templates select="py:value/*"/></qc:argument>
+          <argument type="named" unpacking="true"><xsl:apply-templates select="py:value/*"/></argument>
         </xsl:otherwise>
       </xsl:choose>
     </xsl:for-each>
   </xsl:template>
 
   <xsl:template match="py:Call">
-    <qc:call complex="true">
-      <qc:function>
+    <call complex="true">
+      <function>
         <xsl:apply-templates select="py:func/*"/>
-      </qc:function>
-      <qc:args>
+      </function>
+      <arguments>
         <xsl:call-template name="call_args"/>
-      </qc:args>
-    </qc:call>
+      </arguments>
+    </call>
   </xsl:template>
 
   <xsl:template match="@*|*|text()">
@@ -135,26 +187,26 @@
   </xsl:template>
 
   <xsl:template match="py:For">
-    <qc:loop type="foreach">
+    <loop type="foreach">
       <xsl:choose>
-        <xsl:when test="py:target/qc:expression/py:Name/@id">
+        <xsl:when test="py:target/expression/py:Name/@id">
           <xsl:attribute name="target">
-            <xsl:value-of select="py:target/qc:expression/py:Name/@id"/>
+            <xsl:value-of select="py:target/expression/py:Name/@id"/>
           </xsl:attribute>
         </xsl:when>
-        <xsl:when test="py:target/qc:expression/py:Tuple">
+        <xsl:when test="py:target/expression/py:Tuple">
           <xsl:attribute name="targets">
-            <xsl:apply-templates select="py:target/qc:expression/py:Tuple/py:elts" mode="compact_tuple"/>
+            <xsl:apply-templates select="py:target/expression/py:Tuple/py:elts" mode="compact_tuple"/>
           </xsl:attribute>
         </xsl:when>
       </xsl:choose>
-      <qc:iterable>
+      <iterable>
         <xsl:apply-templates select="py:iter/*"/>
-      </qc:iterable>
-      <qc:block>
+      </iterable>
+      <block>
         <xsl:apply-templates select="py:body/*"/>
-      </qc:block>
-    </qc:loop>
+      </block>
+    </loop>
   </xsl:template>
 
   <xsl:template match="py:elts" mode="compact_tuple">
@@ -162,101 +214,187 @@
   </xsl:template>
 
   <xsl:template match="py:Pass">
-    <qc:statement type="empty"/>
+    <statement type="empty"/>
   </xsl:template>
 
   <xsl:template match="py:Break">
-    <qc:statement  type="break" jump="true"/>
+    <statement  type="break" jump="true"/>
   </xsl:template>
 
   <xsl:template match="py:Continue">
-    <qc:statement  type="continue" jump="true"/>
+    <statement  type="continue" jump="true"/>
+  </xsl:template>
+
+  <xsl:template match="py:Return">
+    <statement type="return">
+       <xsl:apply-templates select="py:value/*"/>
+    </statement>
+  </xsl:template>
+
+    <xsl:template match="py:Raise">
+    <statement type="throw">
+      <xsl:if test="py:exc">
+        <exception>
+          <xsl:apply-templates select="py:exc/*"/>
+        </exception>
+      </xsl:if>
+      <xsl:apply-templates select="py:cause"/>
+    </statement>
+  </xsl:template>
+
+  <xsl:template match="py:Delete">
+    <statement type="delete">
+      <xsl:apply-templates select="py:targets/*"/>
+    </statement>
   </xsl:template>
 
   <xsl:template match="py:While">
-    <qc:loop type="while">
-      <qc:condition>
+    <loop type="while">
+      <condition>
         <xsl:apply-templates select="py:test/*"/>
-      </qc:condition>
-      <qc:block>
+      </condition>
+      <block>
         <xsl:apply-templates select="py:body/*"/>
-      </qc:block>
-    </qc:loop>
+      </block>
+    </loop>
   </xsl:template>
 
   <xsl:template match="py:If">
-      <qc:if>
-        <qc:condition>
+      <if>
+        <condition>
           <xsl:apply-templates select="py:test/*"/>
-        </qc:condition>
-        <qc:then>
+        </condition>
+        <then>
           <xsl:apply-templates select="py:body/*"/>
-        </qc:then>
-        <qc:else>
+        </then>
+        <else>
           <xsl:apply-templates select="py:orelse/*"/>
-        </qc:else>
-      </qc:if>
+        </else>
+      </if>
   </xsl:template>
 
   <xsl:template match="py:FunctionDef">
-    <qc:function name="{@name}">
-      <qc:parameters>
+    <function name="{@name}">
+      <parameters>
         <xsl:for-each select="py:args/py:arguments/py:posonlyargs/py:arg">
-          <qc:parameter name="{@arg}" positional="true" named="false"/>
+          <xsl:variable name="argpos" select="count(../../py:args)+last()-position()+1"/>
+          <parameter name="{@arg}" positional="true" named="false">
+            <xsl:if test="count(../../py:defaults/*)>=$argpos">
+              <xsl:apply-templates select="../../py:defaults/*[last()-$argpos]"/>
+            </xsl:if>
+          </parameter>
         </xsl:for-each>
         <xsl:for-each select="py:args/py:arguments/py:args/py:arg">
-          <qc:parameter name="{@arg}" positional="true" named="true"/>
+          <xsl:variable name="argpos" select="last()-position()"/>
+          <parameter name="{@arg}" positional="true" named="true">
+            <xsl:if test="count(../../py:defaults/*)>=$argpos">
+              <xsl:apply-templates select="../../py:defaults/*[last()-$argpos]"/>
+            </xsl:if>
+          </parameter>
         </xsl:for-each>
         <xsl:for-each select="py:args/py:arguments/py:kwonlyargs/py:arg">
           <xsl:variable name="argpos"  select="position()"/>
-          <qc:parameter name="{@arg}" positional="false" named="true">
+          <parameter name="{@arg}" positional="false" named="true">
             <xsl:if test="name(../../py:kw_defaults/*[position()=$argpos])!='py:empty'">
-            <xsl:apply-templates select="../../py:kw_defaults/*[position()=$argpos]"/>
+              <xsl:apply-templates select="../../py:kw_defaults/*[position()=$argpos]"/>
             </xsl:if>
-          </qc:parameter>
+          </parameter>
         </xsl:for-each>
-      </qc:parameters>
-      <qc:block>
-        <xsl:apply-templates select="py:body"/>
-      </qc:block>
-    </qc:function>
+      </parameters>
+      <block>
+        <xsl:apply-templates select="py:body/*"/>
+      </block>
+      <xsl:if test="py:decorator_list/*">
+        <xsl:apply-templates select="py:decorator_list"/>
+      </xsl:if>
+    </function>
   </xsl:template>
   
   <xsl:template match="py:ImportFrom">
-    <qc:import from="{@module}" which="variable|class|function">
+    <import from="{@module}" which="variable|class|function">
       <xsl:for-each select="py:names">
           <xsl:choose>
             <xsl:when test="py:alias/@asname">
-              <qc:name original_name="{py:alias/@name}">
+              <name original_name="{py:alias/@name}">
                 <xsl:value-of select="py:alias/@asname"/>
-              </qc:name>
+              </name>
             </xsl:when>
             <xsl:otherwise>
-              <qc:name>
+              <name>
                 <xsl:value-of select="py:alias/@name"/>
-              </qc:name>
+              </name>
             </xsl:otherwise>
           </xsl:choose>
       </xsl:for-each>
-    </qc:import>
+    </import>
   </xsl:template>
 
   <xsl:template match="py:Import">
-    <qc:import which="modules">
+    <import which="module">
       <xsl:for-each select="py:names">
           <xsl:choose>
             <xsl:when test="py:alias/@asname">
-              <qc:name original_name="{py:alias/@name}">
+              <name original_name="{py:alias/@name}">
                 <xsl:value-of select="py:alias/@asname"/>
-              </qc:name>
+              </name>
             </xsl:when>
             <xsl:otherwise>
-              <qc:name>
+              <name>
                 <xsl:value-of select="py:alias/@name"/>
-              </qc:name>
+              </name>
             </xsl:otherwise>
           </xsl:choose>
       </xsl:for-each>
-    </qc:import>
+    </import>
+  </xsl:template>
+
+  <xsl:template match="py:ListComp|py:SetComp|py:GeneratorExp|py:DictComp">
+    <comprehension>
+      <xsl:attribute name="product">
+        <xsl:choose>
+          <xsl:when test="name(.)='py:ListComp'">list</xsl:when>
+          <xsl:when test="name(.)='py:SetComp'">set</xsl:when>
+          <xsl:when test="name(.)='py:DictComp'">dictionary</xsl:when>
+          <xsl:when test="name(.)='py:GeneratorExp'">iterable</xsl:when>
+        </xsl:choose>
+      </xsl:attribute>
+        <xsl:choose>
+          <xsl:when test="py:elt">
+            <element>
+              <xslt:apply-templates select="py:elt/*"/>
+            </element>
+          </xsl:when>
+          <xsl:when test="py:key">
+            <pair>
+              <xsl:apply-templates select="py:key/*"/>
+              <xsl:apply-templates select="py:value/*"/>
+            </pair>
+          </xsl:when>
+        </xsl:choose>
+      <xsl:for-each select="py:generators/py:comprehension">
+        <generator>
+          <xsl:choose>
+            <xsl:when test="py:target/py:Name/@id">
+              <xsl:attribute name="target">
+                <xsl:value-of select="py:target/py:Name/@id"/>
+              </xsl:attribute>
+            </xsl:when>
+            <xsl:when test="py:target/py:Tuple">
+              <xsl:attribute name="targets">
+                <xsl:apply-templates select="py:target/py:Tuple/py:elts" mode="compact_tuple"/>
+              </xsl:attribute>
+            </xsl:when>
+          </xsl:choose>
+          <iterable>
+            <xsl:apply-templates select="py:iter/*"/>
+          </iterable>
+          <xsl:for-each select="py:ifs/*">
+            <condition>
+              <xsl:apply-templates select="."/>
+            </condition>
+          </xsl:for-each>
+        </generator>
+      </xsl:for-each>
+    </comprehension>
   </xsl:template>
 </xsl:stylesheet>

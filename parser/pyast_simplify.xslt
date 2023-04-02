@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"
                 xmlns:py="http:/ki.ujep.cz/ns/py_ast"
-                xmlns:qc="http:/ki.ujep.cz/ns/qc_ast">
+                xmlns="http:/ki.ujep.cz/ns/qc_ast">
   <xsl:output method="xml" indent="yes"/>
 
   <xsl:template match="py:ctx"/>
