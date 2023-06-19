@@ -44,10 +44,15 @@ def generate(ast_node: AST, xtree: ET.Element, in_expression=False):
                             generate(item, exprnode, True)
                         case AST():
                             generate(item, fieldnode, in_expression)
+                        case str():
+                            if fieldnode.text:
+                                fieldnode.text += "," + item
+                            else:
+                                fieldnode.text = item
                         case None:
                             ET.SubElement(fieldnode, with_ns("empty", pyast_ns))
                         case _:
-                            raise Exception(f"Invalid item of collection {item}")
+                            raise Exception(f"Invalid item of collection {item} type:{item.__class__.__name__}")
             case unaryop():
                 ET.SubElement(node, with_ns("operator", pyast_ns),
                               symbol=unaryop_map[attrval.__class__])
