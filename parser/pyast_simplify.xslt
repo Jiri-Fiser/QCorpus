@@ -14,16 +14,18 @@
   </xsl:template>
 
   <xsl:template match="py:Attribute">
-    <xsl:element name="py:Name">
-      <xsl:attribute name="id"><xsl:apply-templates select="py:value" mode="attr"/>.<xsl:value-of select="@attr"/></xsl:attribute>
-      <xsl:attribute name="complex">true</xsl:attribute>
+    <xsl:element name="py:Attribute">
+      <xsl:attribute name="name"><xsl:value-of select="@attr"/></xsl:attribute>
+      <xsl:attribute name="longname"><xsl:apply-templates select="py:value" mode="attr"/>.<xsl:value-of select="@attr"/></xsl:attribute>
+      <xsl:apply-templates select="*"/>
     </xsl:element>
   </xsl:template>
 
 
-  <xsl:template match="py:value" mode="attr"><xsl:apply-templates select="py:Attribute|py:Name" mode="attr"/></xsl:template>
+  <xsl:template match="py:value" mode="attr"><xsl:apply-templates select="py:Attribute|py:Name|py:Call" mode="attr"/></xsl:template>
   <xsl:template match="py:Attribute" mode="attr"><xsl:apply-templates select="py:value" mode="attr"/>.<xsl:value-of select="@attr"/></xsl:template>
   <xsl:template match="py:Name" mode="attr"><xsl:value-of select="@id"/></xsl:template>
+  <xsl:template match="py:Call" mode="attr">#</xsl:template>
 
 
 </xsl:stylesheet>

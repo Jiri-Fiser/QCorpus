@@ -1,0 +1,340 @@
+default namespace = "http:/ki.ujep.cz/ns/qc_ast"
+namespace py = "http:/ki.ujep.cz/ns/py_ast"
+
+identifier = xsd:NCName
+
+statement = nesting_statement | import | assignment | assert | declaration | simple_statement
+nesting_statement = if | match | loop | try | class_def | function_def | with
+
+block = element block {statement*}
+
+# declaration: zobecněné přiřazení: které vytváří novou (definition) resp. znovupoužívá proměnnou/proměnné
+# a přiřazuje ji proměnnou (přiřazení je nepovinné)
+
+declaration = element declaration {
+      attribute type {"context_manager" | "global" | "nonlocal" | "try_handler"
+                                        | "class_field" | "exception_handler"},
+         attribute tags {list {"declaration", "definition"?} },
+         attribute definition {xsd:boolean}?,
+         annotation?,
+         (attribute target {identifier} | attribute targets {list {identifier+}}),
+         element value {
+            attribute type {"init"},
+            top_expr
+         }?
+      }
+
+class_def = element class {
+   attribute tags {list {"statement", "nesting_statement", "definition"}},
+   attribute name {identifier},
+   element base {identifier}*,
+   element field {
+      attribute type { "static" | "class" | "instance" },
+      attribute visibility { "public" | "private" },
+      declaration
+   }*,
+   element method {
+      attribute type { "static" | "class" | "instance" },
+      attribute visibility { "public" | "private" },
+      function_def
+   }*,
+   decorator_list?
+ }
+
+ import = element import {
+   attribute tags {list {"statement", "simple_statement"} },
+   attribute from { identifier }?,
+   attribute which {list { ("variable",  "class", "function") | "module" }},
+   element name {
+      attribute original_name { identifier }?,
+      identifier
+   }+
+}
+
+try = element try {
+   attribute tags {list {"statement", "nesting_statement", "exception"} },
+   attribute group {xsd:boolean}?, #FalseIfNot
+   block,
+   element handler {
+           attribute exception {identifier},
+           declaration?,
+           block
+      }+,
+   element finally { block }?
+}
+
+if = element if {
+    attribute tags {list {"statement", "nesting_statement", "conditional"} },
+    element condition {top_expr},
+    element then {statement*},
+    element else {statement}?
+}
+
+
+match = element match  {
+   attribute type {"pattern"},
+   attribute tags {list {"statement", "nesting_statement", "conditional"} },
+   element value {top_expr},
+   element case {
+      element pattern {
+         match_pattern
+         },
+      element guard {top_expr}?,
+      block
+   }+
+}
+
+match_pattern = element py:MatchOr {element py:patterns{match_pattern*}}
+   | element py:MatchValue {element py:value{top_expr}}
+   | element py:MatchSingleton {top_expr}
+   | element py:MatchMapping {pyContext}
+   | element py:MatchSequence {pyContext}
+   | element py:MatchClass {pyContext}
+   | element py:MatchStar {pyContext}
+   | element py:MatchAs {pyContext}
+
+pyContext =
+    (attribute * { text }
+     | text
+     | pyElement | top_expr)*
+
+pyElement = element py:* {
+   pyContext
+}
+
+
+simple_statement = element statement {
+   attribute type {"expression" | "empty" | "break" | "continue" | "return" | "throw" | "delete"},
+   attribute tags {list {"statement", "simple_statement",  ("coroutine" | "async")?, "exception"?, "jump"?} },
+   top_expr?,
+   element case {top_expr}? # only for raise
+}
+
+
+assert = element assert {
+   attribute tags {list {"statement", "simple_statement", "exception", "jump", "conditional"} },
+   element condition {top_expr},
+   element message {top_expr}?
+}
+
+assignment = element assignment {
+   attribute tags {list {"statement", "simple_statement", "definition"?, ("operator", operatorType)?}},
+   attribute definition {xsd:boolean}?,
+   attribute augmented_operator {xsd:token}?,
+   element target {top_expr},
+   annotation?,
+   element value {top_expr}?
+}
+
+loop = foreach | while
+
+foreach = element foreach {
+   attribute tags {list {"statement", "nesting_statement", "loop", "declaration", "async"?} },
+   attribute async {xsd:boolean}?, #FalseIfNot
+   (attribute target {identifier} | attribute targets {list {identifier+}}),
+   element iterable {top_expr},
+   block
+}
+
+while = element while {
+   attribute tags {list {"statement", "nesting_statement", "loop", "conditional"} },
+   element condition {top_expr},
+   block
+}
+
+with = element context {
+   attribute type {"with"},
+   attribute tags {list {"statement", "nesting_statement", "async"?} },
+   attribute async {xsd:boolean}?, #FalseIfNot
+   element items {
+        declaration* &
+        element value {top_expr}* # value without  `as`
+   },
+   block
+}
+
+ function_def = element function {
+   attribute name {identifier},
+   attribute tags {list {"statement", "nesting_statement", "definition", "async"?} },
+   attribute async {xsd:boolean}?, #FalseIfNot
+   parameters,
+   annotation?,
+   block,
+   decorator_list?
+ }
+
+parameters = element parameters {
+   attribute vararg {identifier}?, #*args
+   attribute kwarg {identifier}?,  #**kwargs
+   element parameter {
+      attribute name {identifier},
+      attribute positional {xsd:boolean},
+      attribute named {xsd:boolean},
+      element value {
+         attribute type {"default"},
+         top_expr}?, # default value
+      annotation?
+   }*
+}
+
+annotation = element annotation {
+   top_expr
+}
+
+decorator_list = element py:decorator_list {
+   top_expr
+}
+
+
+top_expr = element expression {expr}
+
+
+# expression level
+
+expr = literal | variable | attr | indexing | call | operator | interpolation
+               | collection | comprehension | lambda
+               | suspend
+               | cond_expr
+               | range  # only in index of indexing
+
+
+literalType = "int" | "float" | "complex" | "str" | "bytes" | "bool" | "NoneType"
+
+literal = element literal {
+   attribute tags {list {"expression", "simple", "literal", literalType}},
+   attribute type {literalType},
+   attribute value {text}
+}
+
+variable = element variable {
+   attribute tags {list {"expression", "simple"}},
+   attribute name {identifier}
+}
+
+indexing = element indexing {
+   attribute tags {list {"expression"}},
+   attribute dimensions {xsd:positiveInteger},
+   element container {expr},
+   element index {expr}
+}
+
+attr = element \attribute {
+   attribute tags {list {"expression"}},
+   attribute longname {text},
+   attribute name {text},
+   variable
+}
+
+range = element range {
+   attribute tags {list {"expression", "literal"}},
+   element start {expr | attribute implicit {text}},
+   element end {expr | attribute implicit {text}},
+   element step {expr | attribute implicit {text}}}
+
+
+interpolation = element interpolated_string {
+   attribute tags {list {"expression", "literal", "string"}},
+   (
+      expr* & element formatted {
+         attribute conversion {"" | "!s" | "!r" | "!a"},
+         element value {expr},
+         element format {expr*}
+      }*
+   )
+}
+
+call = element call {
+   attribute tags {list {"expression"}},
+   (
+      (
+         attribute name {identifier},
+         attribute complex {"false"},
+         arguments
+      ) |
+      (
+         attribute complex {"true"},
+         attribute name {text}?,
+         element function {expr},
+         arguments
+      )
+   )
+}
+
+arguments = element arguments {
+   element argument {
+      attribute type {"positional" | "named"},
+      attribute unpacking {xsd:boolean},
+      expr
+   }*
+}
+
+operatorType = "arithmetic" | "relational" | "boolean" | "bitwise"
+
+operator = element operator {
+   attribute tags {list {"expression", "operator", operatorType, "nonstrict"?}},
+   attribute arity {xsd:positiveInteger},
+   attribute symbol {text},
+   attribute side_efect {xsd:boolean}?,
+   expr+
+}
+
+collection = element collection {
+   attribute tags {list {"expression", "literal"}},
+   (
+      (attribute type {"list" | "tuple" | "set"}, expr*)
+      |
+      (attribute type {"dictionary"},
+         element pair {
+            expr,
+            expr
+         }*
+      )
+   )
+}
+
+lambda = element lambda {
+   attribute tags {list {"expression", "literal"}},
+   parameters,
+   expr
+}
+
+comprehension = element comprehension {
+   attribute tags {list {"expression", "loop"} },
+   (
+    (attribute type {"list" | "tuple" | "set" | "iterable"}, expr)
+    |
+    (attribute type {"dictionary"},
+      element pair {
+         expr, expr
+      }
+    )
+    ),
+   generator+
+}
+
+generator = element generator {
+   attribute tags {list {"expression", "declaration", "definition"}},
+   attribute definition {xsd:boolean}?,
+   (attribute target {identifier} | attribute targets {list {identifier+}}),
+   element iterable {expr},
+   element condition {expr}?
+}
+
+suspend = element suspend {
+   attribute type {"await" | "yield" | "yield_from"},
+   attribute tags {list {"expression", ("coroutine" | "async"), "jump"}},
+   expr?
+}
+
+cond_expr = element cond_expr {
+    attribute tags {list {"expression", "conditional", "nonstrict"} },
+    element condition {expr},
+    element then {expr},
+    element else {expr}
+}
+
+# module level
+
+start = element module {
+   statement*
+}

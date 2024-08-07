@@ -1,0 +1,1014 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<grammar ns="http:/ki.ujep.cz/ns/qc_ast" xmlns:py="http:/ki.ujep.cz/ns/py_ast" xmlns="http://relaxng.org/ns/structure/1.0" datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+  <define name="identifier">
+    <data type="NCName"/>
+  </define>
+  <define name="statement">
+    <choice>
+      <ref name="nesting_statement"/>
+      <ref name="import"/>
+      <ref name="assignment"/>
+      <ref name="assert"/>
+      <ref name="declaration"/>
+      <ref name="simple_statement"/>
+    </choice>
+  </define>
+  <define name="nesting_statement">
+    <choice>
+      <ref name="if"/>
+      <ref name="match"/>
+      <ref name="loop"/>
+      <ref name="try"/>
+      <ref name="class_def"/>
+      <ref name="function_def"/>
+      <ref name="with"/>
+    </choice>
+  </define>
+  <define name="block">
+    <element name="block">
+      <zeroOrMore>
+        <ref name="statement"/>
+      </zeroOrMore>
+    </element>
+  </define>
+  <!--
+    declaration: zobecněné přiřazení: které vytváří novou (definition) resp. znovupoužívá proměnnou/proměnné
+    a přiřazuje ji proměnnou (přiřazení je nepovinné)
+  -->
+  <define name="declaration">
+    <element name="declaration">
+      <attribute name="type">
+        <choice>
+          <value>context_manager</value>
+          <value>global</value>
+          <value>nonlocal</value>
+          <value>try_handler</value>
+          <value>class_field</value>
+          <value>exception_handler</value>
+        </choice>
+      </attribute>
+      <attribute name="tags">
+        <list>
+          <value>declaration</value>
+          <optional>
+            <value>definition</value>
+          </optional>
+        </list>
+      </attribute>
+      <optional>
+        <attribute name="definition">
+          <data type="boolean"/>
+        </attribute>
+      </optional>
+      <optional>
+        <ref name="annotation"/>
+      </optional>
+      <choice>
+        <attribute name="target">
+          <ref name="identifier"/>
+        </attribute>
+        <attribute name="targets">
+          <list>
+            <oneOrMore>
+              <ref name="identifier"/>
+            </oneOrMore>
+          </list>
+        </attribute>
+      </choice>
+      <optional>
+        <element name="value">
+          <attribute name="type">
+            <value>init</value>
+          </attribute>
+          <ref name="top_expr"/>
+        </element>
+      </optional>
+    </element>
+  </define>
+  <define name="class_def">
+    <element name="class">
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>nesting_statement</value>
+          <value>definition</value>
+        </list>
+      </attribute>
+      <attribute name="name">
+        <ref name="identifier"/>
+      </attribute>
+      <zeroOrMore>
+        <element name="base">
+          <ref name="identifier"/>
+        </element>
+      </zeroOrMore>
+      <zeroOrMore>
+        <element name="field">
+          <attribute name="type">
+            <choice>
+              <value>static</value>
+              <value>class</value>
+              <value>instance</value>
+            </choice>
+          </attribute>
+          <attribute name="visibility">
+            <choice>
+              <value>public</value>
+              <value>private</value>
+            </choice>
+          </attribute>
+          <ref name="declaration"/>
+        </element>
+      </zeroOrMore>
+      <zeroOrMore>
+        <element name="method">
+          <attribute name="type">
+            <choice>
+              <value>static</value>
+              <value>class</value>
+              <value>instance</value>
+            </choice>
+          </attribute>
+          <attribute name="visibility">
+            <choice>
+              <value>public</value>
+              <value>private</value>
+            </choice>
+          </attribute>
+          <ref name="function_def"/>
+        </element>
+      </zeroOrMore>
+      <optional>
+        <ref name="decorator_list"/>
+      </optional>
+    </element>
+  </define>
+  <define name="import">
+    <element name="import">
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>simple_statement</value>
+        </list>
+      </attribute>
+      <optional>
+        <attribute name="from">
+          <ref name="identifier"/>
+        </attribute>
+      </optional>
+      <attribute name="which">
+        <list>
+          <choice>
+            <group>
+              <value>variable</value>
+              <value>class</value>
+              <value>function</value>
+            </group>
+            <value>module</value>
+          </choice>
+        </list>
+      </attribute>
+      <oneOrMore>
+        <element name="name">
+          <optional>
+            <attribute name="original_name">
+              <ref name="identifier"/>
+            </attribute>
+          </optional>
+          <ref name="identifier"/>
+        </element>
+      </oneOrMore>
+    </element>
+  </define>
+  <define name="try">
+    <element name="try">
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>nesting_statement</value>
+          <value>exception</value>
+        </list>
+      </attribute>
+      <optional>
+        <attribute name="group">
+          <data type="boolean"/>
+        </attribute>
+      </optional>
+      <!-- FalseIfNot -->
+      <ref name="block"/>
+      <oneOrMore>
+        <element name="handler">
+          <attribute name="exception">
+            <ref name="identifier"/>
+          </attribute>
+          <optional>
+            <ref name="declaration"/>
+          </optional>
+          <ref name="block"/>
+        </element>
+      </oneOrMore>
+      <optional>
+        <element name="finally">
+          <ref name="block"/>
+        </element>
+      </optional>
+    </element>
+  </define>
+  <define name="if">
+    <element name="if">
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>nesting_statement</value>
+          <value>conditional</value>
+        </list>
+      </attribute>
+      <element name="condition">
+        <ref name="top_expr"/>
+      </element>
+      <element name="then">
+        <zeroOrMore>
+          <ref name="statement"/>
+        </zeroOrMore>
+      </element>
+      <optional>
+        <element name="else">
+          <ref name="statement"/>
+        </element>
+      </optional>
+    </element>
+  </define>
+  <define name="match">
+    <element name="match">
+      <attribute name="type">
+        <value>pattern</value>
+      </attribute>
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>nesting_statement</value>
+          <value>conditional</value>
+        </list>
+      </attribute>
+      <element name="value">
+        <ref name="top_expr"/>
+      </element>
+      <oneOrMore>
+        <element name="case">
+          <element name="pattern">
+            <ref name="match_pattern"/>
+          </element>
+          <optional>
+            <element name="guard">
+              <ref name="top_expr"/>
+            </element>
+          </optional>
+          <ref name="block"/>
+        </element>
+      </oneOrMore>
+    </element>
+  </define>
+  <define name="match_pattern">
+    <choice>
+      <element name="py:MatchOr">
+        <element name="py:patterns">
+          <zeroOrMore>
+            <ref name="match_pattern"/>
+          </zeroOrMore>
+        </element>
+      </element>
+      <element name="py:MatchValue">
+        <element name="py:value">
+          <ref name="top_expr"/>
+        </element>
+      </element>
+      <element name="py:MatchSingleton">
+        <ref name="top_expr"/>
+      </element>
+      <element name="py:MatchMapping">
+        <ref name="pyContext"/>
+      </element>
+      <element name="py:MatchSequence">
+        <ref name="pyContext"/>
+      </element>
+      <element name="py:MatchClass">
+        <ref name="pyContext"/>
+      </element>
+      <element name="py:MatchStar">
+        <ref name="pyContext"/>
+      </element>
+      <element name="py:MatchAs">
+        <ref name="pyContext"/>
+      </element>
+    </choice>
+  </define>
+  <define name="pyContext">
+    <zeroOrMore>
+      <choice>
+        <attribute>
+          <anyName/>
+        </attribute>
+        <text/>
+        <ref name="pyElement"/>
+        <ref name="top_expr"/>
+      </choice>
+    </zeroOrMore>
+  </define>
+  <define name="pyElement">
+    <element>
+      <nsName ns="http:/ki.ujep.cz/ns/py_ast"/>
+      <ref name="pyContext"/>
+    </element>
+  </define>
+  <define name="simple_statement">
+    <element name="statement">
+      <group>
+        <attribute name="type">
+          <choice>
+            <value>expression</value>
+            <value>empty</value>
+            <value>break</value>
+            <value>continue</value>
+            <value>return</value>
+            <value>throw</value>
+            <value>delete</value>
+          </choice>
+        </attribute>
+        <attribute name="tags">
+          <list>
+            <value>statement</value>
+            <value>simple_statement</value>
+            <optional>
+              <choice>
+                <value>coroutine</value>
+                <value>async</value>
+              </choice>
+            </optional>
+            <optional>
+              <value>exception</value>
+            </optional>
+            <optional>
+              <value>jump</value>
+            </optional>
+          </list>
+        </attribute>
+        <optional>
+          <ref name="top_expr"/>
+        </optional>
+        <optional>
+          <element name="case">
+            <ref name="top_expr"/>
+          </element>
+        </optional>
+      </group>
+      <!-- only for raise -->
+    </element>
+  </define>
+  <define name="assert">
+    <element name="assert">
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>simple_statement</value>
+          <value>exception</value>
+          <value>jump</value>
+          <value>conditional</value>
+        </list>
+      </attribute>
+      <element name="condition">
+        <ref name="top_expr"/>
+      </element>
+      <optional>
+        <element name="message">
+          <ref name="top_expr"/>
+        </element>
+      </optional>
+    </element>
+  </define>
+  <define name="assignment">
+    <element name="assignment">
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>simple_statement</value>
+          <optional>
+            <value>definition</value>
+          </optional>
+          <optional>
+            <value>operator</value>
+            <ref name="operatorType"/>
+          </optional>
+        </list>
+      </attribute>
+      <optional>
+        <attribute name="definition">
+          <data type="boolean"/>
+        </attribute>
+      </optional>
+      <optional>
+        <attribute name="augmented_operator">
+          <data type="token"/>
+        </attribute>
+      </optional>
+      <element name="target">
+        <ref name="top_expr"/>
+      </element>
+      <optional>
+        <ref name="annotation"/>
+      </optional>
+      <optional>
+        <element name="value">
+          <ref name="top_expr"/>
+        </element>
+      </optional>
+    </element>
+  </define>
+  <define name="loop">
+    <choice>
+      <ref name="foreach"/>
+      <ref name="while"/>
+    </choice>
+  </define>
+  <define name="foreach">
+    <element name="foreach">
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>nesting_statement</value>
+          <value>loop</value>
+          <value>declaration</value>
+          <optional>
+            <value>async</value>
+          </optional>
+        </list>
+      </attribute>
+      <optional>
+        <attribute name="async">
+          <data type="boolean"/>
+        </attribute>
+      </optional>
+      <!-- FalseIfNot -->
+      <choice>
+        <attribute name="target">
+          <ref name="identifier"/>
+        </attribute>
+        <attribute name="targets">
+          <list>
+            <oneOrMore>
+              <ref name="identifier"/>
+            </oneOrMore>
+          </list>
+        </attribute>
+      </choice>
+      <element name="iterable">
+        <ref name="top_expr"/>
+      </element>
+      <ref name="block"/>
+    </element>
+  </define>
+  <define name="while">
+    <element name="while">
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>nesting_statement</value>
+          <value>loop</value>
+          <value>conditional</value>
+        </list>
+      </attribute>
+      <element name="condition">
+        <ref name="top_expr"/>
+      </element>
+      <ref name="block"/>
+    </element>
+  </define>
+  <define name="with">
+    <element name="context">
+      <attribute name="type">
+        <value>with</value>
+      </attribute>
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>nesting_statement</value>
+          <optional>
+            <value>async</value>
+          </optional>
+        </list>
+      </attribute>
+      <optional>
+        <attribute name="async">
+          <data type="boolean"/>
+        </attribute>
+      </optional>
+      <!-- FalseIfNot -->
+      <element name="items">
+        <interleave>
+          <zeroOrMore>
+            <ref name="declaration"/>
+          </zeroOrMore>
+          <zeroOrMore>
+            <element name="value">
+              <ref name="top_expr"/>
+            </element>
+          </zeroOrMore>
+        </interleave>
+        <!-- value without  `as` -->
+      </element>
+      <ref name="block"/>
+    </element>
+  </define>
+  <define name="function_def">
+    <element name="function">
+      <attribute name="name">
+        <ref name="identifier"/>
+      </attribute>
+      <attribute name="tags">
+        <list>
+          <value>statement</value>
+          <value>nesting_statement</value>
+          <value>definition</value>
+          <optional>
+            <value>async</value>
+          </optional>
+        </list>
+      </attribute>
+      <optional>
+        <attribute name="async">
+          <data type="boolean"/>
+        </attribute>
+      </optional>
+      <!-- FalseIfNot -->
+      <ref name="parameters"/>
+      <optional>
+        <ref name="annotation"/>
+      </optional>
+      <ref name="block"/>
+      <optional>
+        <ref name="decorator_list"/>
+      </optional>
+    </element>
+  </define>
+  <define name="parameters">
+    <element name="parameters">
+      <optional>
+        <attribute name="vararg">
+          <ref name="identifier"/>
+        </attribute>
+      </optional>
+      <optional>
+        <!-- *args -->
+        <attribute name="kwarg">
+          <ref name="identifier"/>
+        </attribute>
+      </optional>
+      <zeroOrMore>
+        <!-- **kwargs -->
+        <element name="parameter">
+          <attribute name="name">
+            <ref name="identifier"/>
+          </attribute>
+          <attribute name="positional">
+            <data type="boolean"/>
+          </attribute>
+          <attribute name="named">
+            <data type="boolean"/>
+          </attribute>
+          <optional>
+            <element name="value">
+              <attribute name="type">
+                <value>default</value>
+              </attribute>
+              <ref name="top_expr"/>
+            </element>
+          </optional>
+          <optional>
+            <!-- default value -->
+            <ref name="annotation"/>
+          </optional>
+        </element>
+      </zeroOrMore>
+    </element>
+  </define>
+  <define name="annotation">
+    <element name="annotation">
+      <ref name="top_expr"/>
+    </element>
+  </define>
+  <define name="decorator_list">
+    <element name="py:decorator_list">
+      <ref name="top_expr"/>
+    </element>
+  </define>
+  <define name="top_expr">
+    <element name="expression">
+      <ref name="expr"/>
+    </element>
+  </define>
+  <!-- expression level -->
+  <define name="expr">
+    <choice>
+      <ref name="literal"/>
+      <ref name="variable"/>
+      <ref name="attr"/>
+      <ref name="indexing"/>
+      <ref name="call"/>
+      <ref name="operator"/>
+      <ref name="interpolation"/>
+      <ref name="collection"/>
+      <ref name="comprehension"/>
+      <ref name="lambda"/>
+      <ref name="suspend"/>
+      <ref name="cond_expr"/>
+      <ref name="range"/>
+    </choice>
+  </define>
+  <!-- only in index of indexing -->
+  <define name="literalType">
+    <choice>
+      <value>int</value>
+      <value>float</value>
+      <value>complex</value>
+      <value>str</value>
+      <value>bytes</value>
+      <value>bool</value>
+      <value>NoneType</value>
+    </choice>
+  </define>
+  <define name="literal">
+    <element name="literal">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>simple</value>
+          <value>literal</value>
+          <ref name="literalType"/>
+        </list>
+      </attribute>
+      <attribute name="type">
+        <ref name="literalType"/>
+      </attribute>
+      <attribute name="value"/>
+    </element>
+  </define>
+  <define name="variable">
+    <element name="variable">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>simple</value>
+        </list>
+      </attribute>
+      <attribute name="name">
+        <ref name="identifier"/>
+      </attribute>
+    </element>
+  </define>
+  <define name="indexing">
+    <element name="indexing">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+        </list>
+      </attribute>
+      <attribute name="dimensions">
+        <data type="positiveInteger"/>
+      </attribute>
+      <element name="container">
+        <ref name="expr"/>
+      </element>
+      <element name="index">
+        <ref name="expr"/>
+      </element>
+    </element>
+  </define>
+  <define name="attr">
+    <element name="attribute">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+        </list>
+      </attribute>
+      <attribute name="longname"/>
+      <attribute name="name"/>
+      <ref name="variable"/>
+    </element>
+  </define>
+  <define name="range">
+    <element name="range">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>literal</value>
+        </list>
+      </attribute>
+      <element name="start">
+        <choice>
+          <ref name="expr"/>
+          <attribute name="implicit"/>
+        </choice>
+      </element>
+      <element name="end">
+        <choice>
+          <ref name="expr"/>
+          <attribute name="implicit"/>
+        </choice>
+      </element>
+      <element name="step">
+        <choice>
+          <ref name="expr"/>
+          <attribute name="implicit"/>
+        </choice>
+      </element>
+    </element>
+  </define>
+  <define name="interpolation">
+    <element name="interpolated_string">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>literal</value>
+          <value>string</value>
+        </list>
+      </attribute>
+      <interleave>
+        <zeroOrMore>
+          <ref name="expr"/>
+        </zeroOrMore>
+        <zeroOrMore>
+          <element name="formatted">
+            <attribute name="conversion">
+              <choice>
+                <value/>
+                <value>!s</value>
+                <value>!r</value>
+                <value>!a</value>
+              </choice>
+            </attribute>
+            <element name="value">
+              <ref name="expr"/>
+            </element>
+            <element name="format">
+              <zeroOrMore>
+                <ref name="expr"/>
+              </zeroOrMore>
+            </element>
+          </element>
+        </zeroOrMore>
+      </interleave>
+    </element>
+  </define>
+  <define name="call">
+    <element name="call">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+        </list>
+      </attribute>
+      <choice>
+        <group>
+          <attribute name="name">
+            <ref name="identifier"/>
+          </attribute>
+          <attribute name="complex">
+            <value>false</value>
+          </attribute>
+          <ref name="arguments"/>
+        </group>
+        <group>
+          <attribute name="complex">
+            <value>true</value>
+          </attribute>
+          <optional>
+            <attribute name="name"/>
+          </optional>
+          <element name="function">
+            <ref name="expr"/>
+          </element>
+          <ref name="arguments"/>
+        </group>
+      </choice>
+    </element>
+  </define>
+  <define name="arguments">
+    <element name="arguments">
+      <zeroOrMore>
+        <element name="argument">
+          <attribute name="type">
+            <choice>
+              <value>positional</value>
+              <value>named</value>
+            </choice>
+          </attribute>
+          <attribute name="unpacking">
+            <data type="boolean"/>
+          </attribute>
+          <ref name="expr"/>
+        </element>
+      </zeroOrMore>
+    </element>
+  </define>
+  <define name="operatorType">
+    <choice>
+      <value>arithmetic</value>
+      <value>relational</value>
+      <value>boolean</value>
+      <value>bitwise</value>
+    </choice>
+  </define>
+  <define name="operator">
+    <element name="operator">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>operator</value>
+          <ref name="operatorType"/>
+          <optional>
+            <value>nonstrict</value>
+          </optional>
+        </list>
+      </attribute>
+      <attribute name="arity">
+        <data type="positiveInteger"/>
+      </attribute>
+      <attribute name="symbol"/>
+      <optional>
+        <attribute name="side_efect">
+          <data type="boolean"/>
+        </attribute>
+      </optional>
+      <oneOrMore>
+        <ref name="expr"/>
+      </oneOrMore>
+    </element>
+  </define>
+  <define name="collection">
+    <element name="collection">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>literal</value>
+        </list>
+      </attribute>
+      <choice>
+        <group>
+          <attribute name="type">
+            <choice>
+              <value>list</value>
+              <value>tuple</value>
+              <value>set</value>
+            </choice>
+          </attribute>
+          <zeroOrMore>
+            <ref name="expr"/>
+          </zeroOrMore>
+        </group>
+        <group>
+          <attribute name="type">
+            <value>dictionary</value>
+          </attribute>
+          <zeroOrMore>
+            <element name="pair">
+              <ref name="expr"/>
+              <ref name="expr"/>
+            </element>
+          </zeroOrMore>
+        </group>
+      </choice>
+    </element>
+  </define>
+  <define name="lambda">
+    <element name="lambda">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>literal</value>
+        </list>
+      </attribute>
+      <ref name="parameters"/>
+      <ref name="expr"/>
+    </element>
+  </define>
+  <define name="comprehension">
+    <element name="comprehension">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>loop</value>
+        </list>
+      </attribute>
+      <choice>
+        <group>
+          <attribute name="type">
+            <choice>
+              <value>list</value>
+              <value>tuple</value>
+              <value>set</value>
+              <value>iterable</value>
+            </choice>
+          </attribute>
+          <ref name="expr"/>
+        </group>
+        <group>
+          <attribute name="type">
+            <value>dictionary</value>
+          </attribute>
+          <element name="pair">
+            <ref name="expr"/>
+            <ref name="expr"/>
+          </element>
+        </group>
+      </choice>
+      <oneOrMore>
+        <ref name="generator"/>
+      </oneOrMore>
+    </element>
+  </define>
+  <define name="generator">
+    <element name="generator">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>declaration</value>
+          <value>definition</value>
+        </list>
+      </attribute>
+      <optional>
+        <attribute name="definition">
+          <data type="boolean"/>
+        </attribute>
+      </optional>
+      <choice>
+        <attribute name="target">
+          <ref name="identifier"/>
+        </attribute>
+        <attribute name="targets">
+          <list>
+            <oneOrMore>
+              <ref name="identifier"/>
+            </oneOrMore>
+          </list>
+        </attribute>
+      </choice>
+      <element name="iterable">
+        <ref name="expr"/>
+      </element>
+      <optional>
+        <element name="condition">
+          <ref name="expr"/>
+        </element>
+      </optional>
+    </element>
+  </define>
+  <define name="suspend">
+    <element name="suspend">
+      <attribute name="type">
+        <choice>
+          <value>await</value>
+          <value>yield</value>
+          <value>yield_from</value>
+        </choice>
+      </attribute>
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <choice>
+            <value>coroutine</value>
+            <value>async</value>
+          </choice>
+          <value>jump</value>
+        </list>
+      </attribute>
+      <optional>
+        <ref name="expr"/>
+      </optional>
+    </element>
+  </define>
+  <define name="cond_expr">
+    <element name="cond_expr">
+      <attribute name="tags">
+        <list>
+          <value>expression</value>
+          <value>conditional</value>
+        </list>
+      </attribute>
+      <element name="condition">
+        <ref name="expr"/>
+      </element>
+      <element name="then">
+        <ref name="expr"/>
+      </element>
+      <element name="else">
+        <ref name="expr"/>
+      </element>
+    </element>
+  </define>
+  <!-- module level -->
+  <start>
+    <element name="module">
+      <zeroOrMore>
+        <ref name="statement"/>
+      </zeroOrMore>
+    </element>
+  </start>
+</grammar>
